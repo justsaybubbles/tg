@@ -1,0 +1,5 @@
+python-telegram-bot==13.15
+beautifulsoup4==4.11.1
+requests==2.29.0
+jsonpickle==2.2.0
+python-dotenv==0.21.0

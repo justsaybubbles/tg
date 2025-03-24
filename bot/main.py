@@ -1,26 +1,45 @@
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
-from handlers.add_recipe import AddRecipeHandler
-from handlers.view_recipes import ViewRecipesHandler
-from config import TOKEN
+import asyncio
+import logging
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
+from aiogram.types import Message
 
-def main():
-    updater = Updater(TOKEN, use_context=True)
-    
-    dp = updater.dispatcher
-    
-    # Обработчики команд
-    dp.add_handler(CommandHandler('start', start))
-    dp.add_handler(AddRecipeHandler())
-    dp.add_handler(ViewRecipesHandler())
-    
-    # Запуск бота
-    updater.start_polling()
-    updater.idle()
+from config import BOT_TOKEN
+from handlers.keyboards import get_main_menu, get_class_schedule_menu, get_institutes_menu
+from handlers.schedule import router as schedule_router
 
-def start(update, context):
-    update.message.reply_text(
-        'Привет! Этот бот помогает управлять твоими рецептами.'
-    )
+logging.basicConfig(level=logging.INFO)
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher()
+dp.include_router(schedule_router)
 
-if __name__ == '__main__':
-    main()
+# Стек для возврата на предыдущий уровень
+menu_stack = []
+
+@dp.message(Command("start"))
+async def cmd_start(message: Message):
+    menu_stack.clear()
+    await message.answer("Привет! Я бот расписания МИСиС.", reply_markup=get_main_menu())
+
+@dp.message(lambda message: message.text == "Назад")
+async def go_back(message: types.Message):
+    """Возврат на предыдущий уровень."""
+    if menu_stack:
+        previous_menu = menu_stack.pop()
+        await message.answer("Возврат в предыдущее меню", reply_markup=previous_menu)
+    else:
+        await message.answer("Вы в главном меню", reply_markup=get_main_menu())
+
+@dp.message(lambda message: message.text == "Расписание занятий")
+async def class_schedule(message: types.Message):
+    """Переход в подменю расписания занятий."""
+    menu_stack.append(get_main_menu())
+    await message.answer("Выберите тип расписания:", reply_markup=get_class_schedule_menu())
+
+async def main():
+    print("Бот запущен...")
+    await bot.delete_webhook(drop_pending_updates=True)
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
